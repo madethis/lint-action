@@ -72,9 +72,9 @@ class TSC {
 
 		const isBuildMode = detectBuildMode(dir);
 
-		const buildModeFlag = isBuildMode ? "--build" : "";
+		const buildModeFlag = isBuildMode ? "--build" : "--noEmit";
 
-		return run(`${commandPrefix} tsc ${buildModeFlag} --noEmit --pretty false ${args}`, {
+		return run(`${commandPrefix} tsc ${buildModeFlag} --pretty false ${args}`, {
 			dir,
 			ignoreErrors: true,
 		});
