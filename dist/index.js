@@ -9011,7 +9011,7 @@ class TSC {
 		}
 
 		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(`${commandPrefix} tsc --noEmit --pretty false ${args}`, {
+		return run(`${commandPrefix} tsc --build --pretty false ${args}`, {
 			dir,
 			ignoreErrors: true,
 		});
