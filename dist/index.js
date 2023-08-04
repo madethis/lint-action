@@ -9030,7 +9030,7 @@ function parseBuildModeLine(logLine) {
 	const message = rest.slice(index + 1);
 
 	/** @type {Entry} */
-	return { type, path: file, firstLine: line, col, message };
+	return { type, path: file, firstLine: Number(line), lastLine: Number(line), col, message };
 }
 
 /**
