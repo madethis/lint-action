@@ -10,6 +10,16 @@ const { removeTrailingPeriod } = require("../utils/string");
 
 /** @typedef {import('../utils/lint-result').LintResult} LintResult */
 
+/**
+ *	@typedef {{
+ *	type: string,
+ *	path: string,
+ *	firstLine: number,
+ *	lastLine: number,
+ *	message: string,
+ *	}} Entry
+ */
+
 function detectBuildMode(dir) {
 	try {
 		const tsconfig = JSON.parse(fs.readFileSync(`${dir}/tsconfig.json`));
@@ -24,6 +34,43 @@ function detectBuildMode(dir) {
 	}
 
 	return false;
+}
+
+/**
+ * Parses a single line of the linter output
+ * @param {string} logLine - A single line of the linter output
+ * @returns {Entry | undefined} - A parsed entry
+ */
+function parseBuildModeLine(logLine) {
+	let rest = logLine;
+
+	if (rest.startsWith("error TS")) {
+		// error TS2688: Cannot find type definition file for '@testing-library/cypress
+		return { message: rest.slice(rest.indexOf(" ") + 1) };
+	}
+
+	// e2e-test/tsconfig.json(12,1): error TS1012: Unexpected token
+	let index = rest.indexOf("(");
+	const file = rest.slice(0, index);
+
+	// 12,1): error TS1012: Unexpected token
+	rest = rest.slice(index + 1);
+	index = rest.indexOf(",");
+	const line = rest.slice(0, index);
+
+	// 1): error TS1012: Unexpected token
+	rest = rest.slice(index + 1);
+	index = rest.indexOf(")");
+	const col = rest.slice(0, index);
+
+	// error TS1012: Unexpected token
+	rest = rest.slice(rest.indexOf(" ") + 1);
+	index = rest.indexOf(" ");
+	const type = rest.slice(0, index);
+	const message = rest.slice(index + 1);
+
+	/** @type {Entry} */
+	return { type, path: file, firstLine: line, col, message };
 }
 
 /**
@@ -76,8 +123,6 @@ class TSC {
 
 		const cmd = `${commandPrefix} tsc ${buildModeFlag} --pretty false ${args}`;
 
-		console.log("Running command", cmd);
-
 		return run(cmd, {
 			dir,
 			ignoreErrors: true,
@@ -92,33 +137,51 @@ class TSC {
 	 * @returns {LintResult} - Parsed lint result
 	 */
 	static parseOutput(dir, output) {
-		console.log("tsc output", output);
+		const isBuildMode = detectBuildMode(dir);
 
 		const lintResult = initLintResult();
 		lintResult.isSuccess = output.status === 0;
 
-		// example: file1.ts(4,25): error TS7005: Variable 'str' implicitly has an 'any' type.
-		const regex = /^(?<file>.+)\((?<line>\d+),(?<column>\d+)\):\s(?<code>\w+)\s(?<message>.+)$/gm;
+		if (isBuildMode) {
+			const entries = output.stdout.split("\n").flatMap((line) => {
+				if (!line) {
+					return [];
+				}
 
-		const errors = [];
-		const matches = output.stdout.matchAll(regex);
+				return [parseBuildModeLine(line)];
+			});
 
-		for (const match of matches) {
-			const { file, line, column, code, message } = match.groups;
-			errors.push({ file, line, column, code, message });
-		}
+			for (const entry of entries) {
+				if (entry.type === "warning") {
+					lintResult.warning.push(entry);
+				} else {
+					lintResult.error.push(entry);
+				}
+			}
+		} else {
+			// example: file1.ts(4,25): error TS7005: Variable 'str' implicitly has an 'any' type.
+			const regex = /^(?<file>.+)\((?<line>\d+),(?<column>\d+)\):\s(?<code>\w+)\s(?<message>.+)$/gm;
 
-		for (const error of errors) {
-			const { file, line, message } = error;
+			const errors = [];
+			const matches = output.stdout.matchAll(regex);
 
-			const entry = {
-				path: file,
-				firstLine: Number(line),
-				lastLine: Number(line),
-				message: `${removeTrailingPeriod(message)}`,
-			};
+			for (const match of matches) {
+				const { file, line, column, code, message } = match.groups;
+				errors.push({ file, line, column, code, message });
+			}
 
-			lintResult.error.push(entry);
+			for (const error of errors) {
+				const { file, line, message } = error;
+
+				const entry = {
+					path: file,
+					firstLine: Number(line),
+					lastLine: Number(line),
+					message: `${removeTrailingPeriod(message)}`,
+				};
+
+				lintResult.error.push(entry);
+			}
 		}
 
 		return lintResult;
