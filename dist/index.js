@@ -8958,6 +8958,8 @@ module.exports = SwiftLint;
 /***/ 7540:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
+const fs = __nccwpck_require__(7147);
+
 const core = __nccwpck_require__(2186);
 
 const { run } = __nccwpck_require__(9575);
@@ -8967,6 +8969,22 @@ const { getNpmBinCommand } = __nccwpck_require__(1838);
 const { removeTrailingPeriod } = __nccwpck_require__(9321);
 
 /** @typedef {import('../utils/lint-result').LintResult} LintResult */
+
+function detectBuildMode(dir) {
+	try {
+		const tsconfig = JSON.parse(fs.readFileSync(`${dir}/tsconfig.json`));
+
+		const keys = Object.keys(tsconfig);
+
+		if (keys.length === 2 && keys.includes("files") && keys.includes("references")) {
+			return true;
+		}
+	} catch (err) {
+		// Ignored
+	}
+
+	return false;
+}
 
 /**
  * https://www.typescriptlang.org/docs/handbook/compiler-options.html
@@ -9011,7 +9029,12 @@ class TSC {
 		}
 
 		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(`${commandPrefix} tsc --noEmit --pretty false ${args}`, {
+
+		const isBuildMode = detectBuildMode(dir);
+
+		const buildModeFlag = isBuildMode ? "--build" : "";
+
+		return run(`${commandPrefix} tsc ${buildModeFlag} --noEmit --pretty false ${args}`, {
 			dir,
 			ignoreErrors: true,
 		});
@@ -9025,7 +9048,6 @@ class TSC {
 	 * @returns {LintResult} - Parsed lint result
 	 */
 	static parseOutput(dir, output) {
-
 		console.log("tsc output", output);
 
 		const lintResult = initLintResult();

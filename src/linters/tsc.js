@@ -1,3 +1,5 @@
+const fs = require("fs");
+
 const core = require("@actions/core");
 
 const { run } = require("../utils/action");
@@ -7,6 +9,22 @@ const { getNpmBinCommand } = require("../utils/npm/get-npm-bin-command");
 const { removeTrailingPeriod } = require("../utils/string");
 
 /** @typedef {import('../utils/lint-result').LintResult} LintResult */
+
+function detectBuildMode(dir) {
+	try {
+		const tsconfig = JSON.parse(fs.readFileSync(`${dir}/tsconfig.json`));
+
+		const keys = Object.keys(tsconfig);
+
+		if (keys.length === 2 && keys.includes("files") && keys.includes("references")) {
+			return true;
+		}
+	} catch (err) {
+		// Ignored
+	}
+
+	return false;
+}
 
 /**
  * https://www.typescriptlang.org/docs/handbook/compiler-options.html
@@ -51,7 +69,12 @@ class TSC {
 		}
 
 		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(`${commandPrefix} tsc --noEmit --pretty false ${args}`, {
+
+		const isBuildMode = detectBuildMode(dir);
+
+		const buildModeFlag = isBuildMode ? "--build" : "";
+
+		return run(`${commandPrefix} tsc ${buildModeFlag} --noEmit --pretty false ${args}`, {
 			dir,
 			ignoreErrors: true,
 		});
@@ -65,7 +88,6 @@ class TSC {
 	 * @returns {LintResult} - Parsed lint result
 	 */
 	static parseOutput(dir, output) {
-
 		console.log("tsc output", output);
 
 		const lintResult = initLintResult();
