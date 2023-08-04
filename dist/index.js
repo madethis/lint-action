@@ -9032,9 +9032,13 @@ class TSC {
 
 		const isBuildMode = detectBuildMode(dir);
 
-		const buildModeFlag = isBuildMode ? "--build" : "";
+		const buildModeFlag = isBuildMode ? "--build" : "--noEmit";
 
-		return run(`${commandPrefix} tsc ${buildModeFlag} --noEmit --pretty false ${args}`, {
+		const cmd = `${commandPrefix} tsc ${buildModeFlag} --pretty false ${args}`;
+
+		console.log("Running command", cmd);
+
+		return run(cmd, {
 			dir,
 			ignoreErrors: true,
 		});
