@@ -9025,6 +9025,9 @@ class TSC {
 	 * @returns {LintResult} - Parsed lint result
 	 */
 	static parseOutput(dir, output) {
+
+		console.log("tsc output", output);
+
 		const lintResult = initLintResult();
 		lintResult.isSuccess = output.status === 0;
 
